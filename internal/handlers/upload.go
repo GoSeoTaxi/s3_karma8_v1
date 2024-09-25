@@ -70,7 +70,8 @@ func (h *UploadHandler) HandleUpload(w http.ResponseWriter, r *http.Request) {
 			uploadErrChan <- err
 		}()
 
-		_, err = h.copyWithContext(r.Context(), pw, part)
+		_, err = ioCopyContext(r.Context(), pw, part)
+
 		if err != nil {
 			_ = pw.CloseWithError(err)
 			h.Logger.Error("Ошибка при копировании данных в pipe", zap.Error(err))
@@ -94,35 +95,21 @@ func (h *UploadHandler) HandleUpload(w http.ResponseWriter, r *http.Request) {
 	_, _ = w.Write([]byte("Файл успешно загружен!\n"))
 }
 
-func (h *UploadHandler) copyWithContext(ctx context.Context, dst io.Writer, src io.Reader) (written int64, err error) {
-	buf := make([]byte, 32*1024)
-	for {
-		select {
-		case <-ctx.Done():
-			err = ctx.Err()
-			return
-		default:
-			nr, er := src.Read(buf)
-			if nr > 0 {
-				nw, ew := dst.Write(buf[:nr])
-				if nw > 0 {
-					written += int64(nw)
-				}
-				if ew != nil {
-					err = ew
-					return
-				}
-				if nw != nr {
-					err = io.ErrShortWrite
-					return
-				}
-			}
-			if er != nil {
-				if er != io.EOF {
-					err = er
-				}
-				break
-			}
-		}
+func ioCopyContext(ctx context.Context, dst io.Writer, src io.Reader) (int64, error) {
+	done := make(chan error, 1)
+
+	var n int64
+
+	go func() {
+		var err error
+		n, err = io.Copy(dst, src)
+		done <- err
+	}()
+
+	select {
+	case <-ctx.Done():
+		return n, ctx.Err()
+	case err := <-done:
+		return n, err
 	}
 }

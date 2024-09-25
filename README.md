@@ -1,29 +1,53 @@
-ReadME.md
+# S3 Karma8 v1
 
-git clone https://github.com/GoSeoTaxi/s3_karma8_v1.git
-cd s3_karma8_v1
-make docker-up
+S3 Karma8 v1 - это сервис для загрузки и скачивания больших файлов с возможностью работы с частями файла.
 
+## Установка
 
+1. Клонируйте репозиторий:
+   git clone https://github.com/GoSeoTaxi/s3_karma8_v1.git
 
-Use:
+2. Клонируйте репозиторий:
+   cd s3_karma8_v1
+3. Соберите и запустите сервис:
+   make docker-up
 
-cd /tmp
-dd if=/dev/urandom bs=1G count=10 of=tmpfile.ext 
-md5sum tmpfile.ext
-curl -X POST "http://localhost:8080/files/upload" -F "file=@tmpfile.ext"
-rm tmpfile.ext
-curl -OJ "http://localhost:8080/files/tmpfile.ext/download"
-md5sum tmpfile.ext
-rm tmpfile.ext 
+4. Проверьте работу сервиса:
+   ```
+   cd /tmp
+   dd if=/dev/urandom bs=1G count=10 of=tmpfile.ext
+   md5sum tmpfile.ext
+   curl -X POST "http://localhost:8080/files/upload" -F "file=@tmpfile.ext"
+   rm tmpfile.ext
+   curl -OJ "http://localhost:8080/files/tmpfile.ext/download"
+   md5sum tmpfile.ext
+   rm tmpfile.ext
+   ```
 
+5. Весь список команд
 
-// additional commands
-curl -OJ "http://localhost:8080/files/tmpfile.ext/download" - Полная загрузка файла
-curl -X GET http://localhost:8080/files/tmpfile.ext/parts - Получить список частей файла
-curl -OJ "http://localhost:8080/files/tmpfile.ext/parts/10" - Скачать часть файла
+- Полное скачивание файла
+   ```
+   curl -X POST "http://localhost:8080/files/upload" -F "file=@tmpfile.ext"
+   ```
 
-+++ log
+- Полное скачивание файла
+   ```
+   curl -OJ "http://localhost:8080/files/tmpfile.ext/download"
+   ```
+  
+- Получить список частей файла
+   ```
+   curl -X GET http://localhost:8080/files/tmpfile.ext/parts
+   ```
+
+- Скачать часть файла
+   ```
+   curl -OJ "http://localhost:8080/files/tmpfile.ext/parts/10"
+   ```
+
+6. Логи сервиса
+```
 dd if=/dev/urandom bs=1G count=10 of=tmpfile.ext
 10+0 records in
 10+0 records out
@@ -44,3 +68,45 @@ Dload  Upload   Total   Spent    Left  Speed
 
 md5sum tmpfile.ext
 8cac33d02c96da7026088c8f560dcc16  tmpfile.ext
+```
+
+
+Сервис реализация текущего ТЗ
+```
+Вы решили создать конкурента Amazon S3 и знаете как сделать лучший сервис хранения файлов.
+
+На сервер A по REST присылают файл, его надо разрезать на 6 примерно равных частей и сохранить на серверах хранения Bn (n ≥ 6).
+
+При REST-запросе на сервер A нужно достать куски с серверов Bn склеить их и отдать файл.
+
+Условия:
+    1. Один сервер для REST запросов
+    2. Несколько серверов для хранения кусков файлов
+    3. Файлы могут достигать размера 10 GiB
+    
+Ограничения:
+    1. Реализовать тестовый модуль для сервиса, который обеспечит проверку его функционала, продемонстрирует загрузку и чтение файла.
+    2. Сервера для хранения могут добавляться в систему в любой момент, но не могут удаляться из системы.
+    3. Предусмотреть равномерное заполнение серверов хранения.
+    4. Необходимо учесть различные сценарии, например, пользователь ушел во время загрузки.
+    5. Сервера хранения должны быть отдельными приложениями. Протокол общения REST сервера с серверами хранения нужно выбрать самостоятельно.
+    6. Написать docker-compose для поднятия сервиса.
+    7. Код разместить в Github.
+    
+Преимуществом будет:
+    - Тестируемый код, речь про unit тесты, при этом сами тесты писать не нужно. В первую очередь будет учитываться подход к решению задачи, однако и на качество кода мы тоже смотрим.
+    - Этим тестовым заданием мы хотим понять образ вашего мышления и умение найти подход к решению задач.
+```
+
+Реализация 
+- Один сервер для REST запросов = s3_karma8
+- Несколько серверов для хранения кусков файлов = MinIO
+- Файлы могут достигать размера 10 GiB - максимальный размер загружаемого файла 10 GiB
+
+Тестовый модуль имеет методы на загрузку и получения целого файла, а так же получения списка частей файла и скачивание отдельной части файла.
+Кластером сервиса хранением файлов можно управлять через nginx и перезапуском (или созданием нового) кластера MinIO.
+Равномерное заполнение серверов хранения обеспечивает MinIO
+Прерывание загрузки обеспечивается проверкой контекста в HandleUpload
+Сервер хранение - отдельное приложение (кластер MinIO)
+Описан docker-compose
+Код на Github
